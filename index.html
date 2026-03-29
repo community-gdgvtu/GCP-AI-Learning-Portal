@@ -254,58 +254,52 @@
             if (stream) stream.getTracks().forEach(track => track.stop());
             if (recognition) { recognition.onend = null; recognition.stop(); }
             
-            appendChat("ai-msg", "Processing background audio telemetry...");
-            document.getElementById('btn-end').innerText = "Processing...";
-            
-            try {
-                const res = await fetch(HEARING_API_URL, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ transcript: sessionTranscript, session_id: sessionId })
-                });
-                const data = await res.json();
-                
-                // Show Quiz Setup Modal
-                document.getElementById('learned-topics').innerText = data.topics;
-                document.getElementById('exam-setup-modal').style.display = 'flex';
-
-            } catch (e) {
-                appendChat("warning-msg", "Could not connect to Hearing Agent.");
-                resetUI();
-            }
+            // Instantly open the setup modal BEFORE processing
+            document.getElementById('learned-topics').innerText = "Analyzing your audio in the background...";
+            document.getElementById('exam-setup-modal').style.display = 'flex';
         }
 
-        // =========================================================================
-        // EXAM LOGIC
-        // =========================================================================
         function skipExam() {
             document.getElementById('exam-setup-modal').style.display = 'none';
-            appendChat("ai-msg", "Exam skipped. Session concluded.");
+            appendChat("ai-msg", "Session concluded. Audio telemetry discarded as requested.");
             resetUI();
         }
 
         async function generateExam() {
             const numQs = document.getElementById('num-questions').value;
-            const topics = document.getElementById('learned-topics').innerText;
             
             document.getElementById('exam-setup-modal').style.display = 'none';
-            appendChat("ai-msg", `Generating a ${numQs}-question exam on: ${topics}...`);
+            appendChat("ai-msg", "Processing audio and generating your customized exam. Please wait...");
+            document.getElementById('btn-end').innerText = "Processing...";
             
             try {
-                const res = await fetch(QUIZ_API_URL, {
+                // The frontend makes ONE call to the Hearing Agent. 
+                // The Hearing Agent handles the rest via A2A!
+                const res = await fetch(HEARING_API_URL, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ topics: topics, num_questions: numQs })
+                    body: JSON.stringify({ 
+                        transcript: sessionTranscript, 
+                        session_id: sessionId,
+                        num_questions: numQs 
+                    })
                 });
                 const data = await res.json();
                 
-                if (data.status === "success") {
-                    currentExamData = data.questions;
+                // Show the summarized topics
+                playSound('success');
+                appendChat("summary-msg", "🧠 **Topics Mastered This Session:**\n\n" + data.topics);
+                
+                // Automatically launch the quiz returned by the A2A call
+                if (data.quiz_data && data.quiz_data.status === "success") {
+                    currentExamData = data.quiz_data.questions;
                     renderActiveExam();
                 } else {
-                    appendChat("warning-msg", "Could not generate exam: " + data.message);
+                    appendChat("warning-msg", "Could not generate exam: " + (data.quiz_data ? data.quiz_data.message : "Unknown error"));
                     resetUI();
                 }
-            } catch(e) {
-                appendChat("warning-msg", "Quiz Agent offline.");
+
+            } catch (e) {
+                appendChat("warning-msg", "Could not connect to backend orchestration layer.");
                 resetUI();
             }
         }
@@ -393,22 +387,34 @@
             canvas.getContext('2d').drawImage(video, 0, 0);
             
             try {
+                // We send the image AND our previous status to the Vision Agent
                 const res = await fetch(VISION_API_URL, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image: canvas.toDataURL('image/jpeg'), session_id: sessionId })
+                    body: JSON.stringify({ 
+                        image: canvas.toDataURL('image/jpeg'), 
+                        session_id: sessionId,
+                        previous_status: currentFocusStatus 
+                    })
                 });
+                
                 const data = await res.json();
                 
                 const score = data.focus_score !== undefined ? data.focus_score : 0;
                 const status = data.status || "Unknown";
                 const reason = data.reason || "Maintaining focus";
 
+                // Update UI Stats
                 const statusBox = document.getElementById('status-container');
                 document.getElementById('focus-score').innerText = score + "%";
                 document.getElementById('focus-reason').innerText = reason;
                 statusBox.className = status === "Focused" ? "status-box status-focused" : "status-box status-distracted";
 
-                if (status === "Distracted" && currentFocusStatus === "Focused") triggerWarning(reason);
+                // THE MAGIC: If the Vision Agent generated a warning via A2A, display it!
+                if (data.warning_message) {
+                    playSound('warning');
+                    appendChat("warning-msg", data.warning_message);
+                }
+                
                 currentFocusStatus = status; 
             } catch (e) {}
         }

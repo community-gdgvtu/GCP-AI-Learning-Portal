@@ -3,6 +3,7 @@ from flask_cors import CORS
 import vertexai
 from vertexai.generative_models import GenerativeModel
 from google.cloud import bigquery
+import requests # NEW: Allows this server to talk to other servers!
 
 app = Flask(__name__)
 CORS(app)
@@ -12,45 +13,50 @@ vertexai.init(project=PROJECT_ID, location="us-central1")
 model = GenerativeModel("gemini-2.5-flash-lite")
 bq_client = bigquery.Client(project=PROJECT_ID)
 
+# PASTE YOUR ACTUAL QUIZ API URL HERE
+QUIZ_AGENT_URL = "https://quiz-api-459620202221.us-central1.run.app/api/quiz"
+
 @app.route('/api/hearing', methods=['POST'])
 def analyze_background_audio():
     try:
         data = request.json
         transcript = data.get('transcript', '')
         session_id = data.get('session_id', 'UNKNOWN_SESSION')
+        num_questions = data.get('num_questions', 5) # Received from frontend
 
-        # If the user was completely silent all session
         if not transcript.strip():
-            return jsonify({"topics": "No audio recorded during this session."})
+            return jsonify({"topics": "No audio recorded.", "quiz_data": None})
 
-        # Tell Gemini to act as a summarizer
-        prompt = f"""
-        Analyze this background audio transcript from a student's study session:
-        "{transcript}"
-        
-        What specific educational topics did the user learn or discuss? 
-        Return a concise, comma-separated list of the main topics. If there is no educational content, reply with 'No clear educational topics detected'.
-        """
-        
+        # 1. Generate Topics
+        prompt = f"Analyze this background audio transcript: '{transcript}'. What specific educational topics did the user learn? Return a concise, comma-separated list."
         response = model.generate_content(prompt)
         topics = response.text.strip()
 
-        # Log the learned topics into your unified BigQuery table
+        # 2. Log Topics to BigQuery
         if session_id != 'UNKNOWN_SESSION':
-            query = f"""
-                INSERT INTO `{PROJECT_ID}.focus_db.session_logs` 
-                (session_id, timestamp, event_type, user_text, ai_text)
-                VALUES (@session, CURRENT_TIMESTAMP(), 'HEARING_SUMMARY', 'Background Audio Transcript Processed', @topics)
-            """
-            job_config = bigquery.QueryJobConfig(
-                query_parameters=[
-                    bigquery.ScalarQueryParameter("session", "STRING", session_id),
-                    bigquery.ScalarQueryParameter("topics", "STRING", topics)
-                ]
-            )
+            query = f"INSERT INTO `{PROJECT_ID}.focus_db.session_logs` (session_id, timestamp, event_type, user_text, ai_text) VALUES (@session, CURRENT_TIMESTAMP(), 'HEARING_SUMMARY', 'Background Audio Processed', @topics)"
+            job_config = bigquery.QueryJobConfig(query_parameters=[
+                bigquery.ScalarQueryParameter("session", "STRING", session_id),
+                bigquery.ScalarQueryParameter("topics", "STRING", topics)
+            ])
             bq_client.query(query, job_config=job_config).result()
+
+        # 3. AGENT-TO-AGENT COMMUNICATION (A2A)
+        # The Hearing Agent now securely calls the Quiz Agent behind the scenes!
+        quiz_payload = {
+            "topics": topics,
+            "num_questions": int(num_questions),
+            "session_id": session_id
+        }
         
-        return jsonify({"topics": topics})
+        quiz_response = requests.post(QUIZ_AGENT_URL, json=quiz_payload)
+        quiz_data = quiz_response.json() if quiz_response.ok else {"status": "error", "message": "Quiz agent failed to respond."}
+
+        # 4. Return everything back to the Frontend
+        return jsonify({
+            "topics": topics,
+            "quiz_data": quiz_data
+        })
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
