@@ -1,0 +1,10 @@
+{
+  "vision_agent": {
+    "role": "monitor visual focus",
+    "endpoint": "/api/vision"
+  },
+  "hearing_agent": {
+    "role": "process audio context",
+    "endpoint": "/api/hearing"
+  }
+}

@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Enterprise Learning Portal</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <style>
+        * { box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background: #121212; /* Dark Theme Background */
+            color: #e0e0e0;
+            display: flex; 
+            flex-direction: column; 
+            height: 100vh;  /* Exactly 100% of viewport height */
+            width: 100vw;   /* Exactly 100% of viewport width */
+            overflow: hidden; /* ABSOLUTELY NO PAGE SCROLLING */
+        }
+        
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 15px 25px; background: #1e1e1e; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); border: 1px solid #333; flex-shrink: 0; }
+        .header h1 { margin: 0; font-size: 24px; color: #ffffff; font-weight: 700; }
+        
+        .btn { padding: 10px 20px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; font-size: 14px; }
+        .btn-start { background: #0d6efd; color: white; }
+        .btn-start:hover { background: #0b5ed7; }
+        .btn-end { background: #dc3545; color: white; display: none; }
+        .btn-analytics { background: #6f42c1; color: white; margin-right: 15px; }
+        
+        /* 2. FLEXBOX LAYOUT MANAGEMENT */
+        .main-container { display: flex; gap: 20px; flex: 1; min-height: 0; overflow: hidden; }
+        .panel { background: #1e1e1e; border-radius: 10px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); display: flex; flex-direction: column; border: 1px solid #333; }
+        
+        /* 3. SHRINK THE LEFT PANEL (CAMERA) AND GROW THE RIGHT PANEL (CHAT) */
+        .main-container > .panel:first-child { flex: 0 0 320px; overflow-y: auto; } /* Locks camera side to 320px width */
+        .main-container > .panel:last-child { flex: 1; min-width: 0; } /* Chat side takes the rest */
+        
+        .panel h2 { margin-top: 0; font-size: 18px; border-bottom: 2px solid #333; padding-bottom: 12px; color: #cfcfcf; flex-shrink: 0; }
+        
+        /* 4. SHRINK THE VIDEO ELEMENT */
+        video { 
+            width: 100%; 
+            max-height: 200px; /* Limits how tall the camera can get */
+            object-fit: cover; /* Prevents stretching */
+            border-radius: 8px; 
+            background: #000; 
+            border: 1px solid #444; 
+            flex-shrink: 0;
+        }
+        
+        .status-box { margin-top: 20px; padding: 15px; border-radius: 8px; background: #2d2d2d; border-left: 5px solid #6c757d; flex-shrink: 0; }
+        .status-focused { background: #14331d; border-left-color: #198754; color: #75b798; }
+        .status-distracted { background: #3b1619; border-left-color: #dc3545; color: #ea868f; }
+        .focus-percentage { font-size: 32px; font-weight: bold; margin: 10px 0; color: #ffffff; }
+        .reason-text { font-size: 14px; color: #aaa; font-weight: 500; }
+        
+        /* 5. INTERNAL SCROLLING FOR CHAT ONLY */
+        #chat-window { flex: 1; overflow-y: auto; border: 1px solid #333; border-radius: 8px; padding: 20px; margin-bottom: 15px; background: #121212; }
+        .msg { margin-bottom: 15px; padding: 14px 18px; border-radius: 10px; max-width: 85%; line-height: 1.6; font-size: 15px; }
+        .user-msg { background: #0d4296; color: #ffffff; align-self: flex-end; margin-left: auto; border-right: 4px solid #0d6efd; }
+        .ai-msg { background: #2d2d2d; color: #e0e0e0; border-left: 4px solid #6c757d; }
+        .warning-msg { background: #332701; color: #ffda6a; border-left: 4px solid #ffc107; font-weight: 600; }
+        .summary-msg { background: #2c1a4d; color: #d6b3ff; border-left: 4px solid #9f7aea; font-weight: 600; }
+        
+        .msg pre { background: #000000; color: #00ff00; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: monospace; border: 1px solid #444; }
+        .msg code { background: #000000; padding: 3px 6px; border-radius: 4px; font-family: monospace; color: #ff9d00; }
+        .msg p { margin-top: 0; }
+        
+        .input-area { display: flex; gap: 12px; align-items: center; flex-shrink: 0; }
+        input[type="text"] { flex: 1; padding: 14px; border: 1px solid #444; border-radius: 8px; background: #2d2d2d; color: white; font-size: 15px; transition: border 0.2s; }
+        input[type="text"]:focus { outline: none; border-color: #0d6efd; }
+        
+        .btn-mic { background: #333; color: white; padding: 14px; border-radius: 8px; border: 1px solid #444; cursor: pointer; }
+        .btn-mic:hover:not(:disabled) { background: #444; }
+        .btn-mic.recording { background: #dc3545; color: white; border-color: #dc3545; animation: pulse 1.5s infinite; }
+        .btn-send { background: #198754; color: white; padding: 0 25px; }
+
+        /* MODAL STYLES */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: #1e1e1e; color: #e0e0e0; width: 80%; max-width: 800px; max-height: 85vh; border-radius: 12px; padding: 30px; display: flex; flex-direction: column; overflow-y: auto; border: 1px solid #333; }
+        
+        .exam-question { background: #121212; border: 1px solid #333; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        .exam-option { display: block; padding: 10px; margin: 5px 0; background: #2d2d2d; border: 1px solid #444; border-radius: 6px; cursor: pointer; }
+        .exam-option:hover { background: #333; }
+        
+        select, .big-btn { padding: 12px; font-size: 16px; border-radius: 6px; border: 1px solid #444; background: #2d2d2d; color: white; }
+        .big-btn { background: #0d6efd; border: none; cursor: pointer; margin-top: 20px; color: white; }
+        .big-btn:hover { background: #0b5ed7; }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Learning Analytics Portal</h1>
+        <div>
+            <span id="session-display" style="margin-right: 15px; color: #a0aec0; font-family: monospace; font-weight: 600;"></span>
+            <button id="btn-analytics" class="btn btn-analytics" onclick="openAnalytics()">📊 Analytics Dashboard</button>
+            <button id="btn-start" class="btn btn-start" onclick="startSession()">▶ Start Session</button>
+            <button id="btn-end" class="btn btn-end" onclick="endSession()">⏹ End Session</button>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="panel">
+            <h2>Vision Telemetry</h2>
+            <video id="webcam" autoplay playsinline muted></video>
+            <canvas id="canvas" style="display:none;"></canvas>
+            <div id="status-container" class="status-box">
+                <div style="font-size: 14px; color: #718096; font-weight: 600; text-transform: uppercase;">Current Focus Level</div>
+                <div id="focus-score" class="focus-percentage">--%</div>
+                <div id="focus-reason" style="font-size: 15px; color: #718096;">Awaiting session start...</div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>AI Tutor Interface</h2>
+            <div id="chat-window">
+                <div class="msg ai-msg">System ready. Click 'Start Session' to begin.</div>
+            </div>
+            <div class="input-area">
+                <button class="btn btn-mic" id="btn-mic" onclick="toggleMic(event)" disabled>🎤</button>
+                <input type="text" id="chat-input" placeholder="Type your question..." disabled>
+                <button class="btn btn-send" id="btn-send" onclick="sendMessage()" disabled>Send</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="exam-setup-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 500px; text-align: center;">
+            <h2>📝 Session Complete!</h2>
+            <p>I have extracted the topics you learned: <br><strong id="learned-topics" style="color: #3182ce;"></strong></p>
+            <p>How many questions would you like in your knowledge check?</p>
+            <select id="num-questions">
+                <option value="5">5 Questions</option>
+                <option value="10">10 Questions</option>
+                <option value="15">15 Questions</option>
+                <option value="20">20 Questions</option>
+            </select>
+            <button class="big-btn" onclick="generateExam()">Generate Exam</button>
+            <button class="btn" style="margin-top: 10px; background: #e2e8f0;" onclick="skipExam()">Skip Exam</button>
+        </div>
+    </div>
+
+    <div id="active-exam-modal" class="modal-overlay">
+        <div class="modal-content" id="exam-content">
+            </div>
+    </div>
+
+    <div id="analytics-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #edf2f7; padding-bottom: 15px; margin-bottom: 20px;">
+                <h2>📊 BigQuery Session History</h2>
+                <button onclick="document.getElementById('analytics-modal').style.display='none'" style="background:none; border:none; font-size:24px; cursor:pointer;">×</button>
+            </div>
+            <div style="display: flex; gap: 20px; flex: 1; min-height: 0;">
+                <div id="session-list" style="flex: 1; border-right: 2px solid #edf2f7; overflow-y: auto;"></div>
+                <div id="session-details" style="flex: 2; overflow-y: auto;">Select a session on the left to view logs.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // =========================================================================
+        // PASTE ALL 5 URLS HERE!
+        // =========================================================================
+        const VISION_API_URL    = "https://vision-api-459620202221.us-central1.run.app/api/vision";
+        const CHAT_API_URL      = "https://tutor-api-459620202221.us-central1.run.app/api/chat";
+        const ANALYTICS_API_URL = "https://tutor-api-459620202221.us-central1.run.app/api/sessions"; 
+        const HEARING_API_URL   = "https://hearing-api-459620202221.us-central1.run.app/api/hearing"; 
+        const QUIZ_API_URL      = "https://quiz-api-459620202221.us-central1.run.app/api/quiz"; 
+        const LOG_SCORE_URL     = "https://quiz-api-459620202221.us-central1.run.app/api/log_score"; 
+
+        let sessionId = null;
+        let visionInterval = null;
+        let currentFocusStatus = "Focused";
+        let sessionTranscript = ""; 
+        let isChatMicActive = false; 
+        
+        let currentExamData = []; // Holds the generated quiz
+
+        // Audio Synth
+        let audioCtx = null;
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+        function playSound(type) {
+            initAudio(); if (!audioCtx) return;
+            const osc = audioCtx.createOscillator(); const gainNode = audioCtx.createGain();
+            osc.connect(gainNode); gainNode.connect(audioCtx.destination);
+            if (type === 'warning') {
+                osc.type = 'square'; osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.4);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+            }
+        }
+
+        // Mic logic
+        let recognition = null;
+        if ('webkitSpeechRecognition' in window) {
+            recognition = new webkitSpeechRecognition();
+            recognition.continuous = true; recognition.interimResults = true; 
+            recognition.onresult = function(event) {
+                let finalTranscript = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript + " ";
+                }
+                if (finalTranscript) {
+                    sessionTranscript += finalTranscript;
+                    if (isChatMicActive) {
+                        const input = document.getElementById('chat-input');
+                        input.value = (input.value + " " + finalTranscript).trim();
+                    }
+                }
+            };
+            recognition.onend = function() { if (sessionId) recognition.start(); };
+        }
+
+        async function startSession() {
+            initAudio(); 
+            sessionId = "SESSION_" + Date.now().toString();
+            sessionTranscript = ""; 
+            
+            document.getElementById('session-display').innerText = "ID: " + sessionId;
+            document.getElementById('btn-start').style.display = "none";
+            document.getElementById('btn-analytics').style.display = "none";
+            document.getElementById('btn-end').style.display = "inline-block";
+            
+            document.getElementById('chat-input').disabled = false;
+            document.getElementById('btn-send').disabled = false;
+            if (recognition) { document.getElementById('btn-mic').disabled = false; recognition.start(); }
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                document.getElementById('webcam').srcObject = stream;
+            } catch (err) {}
+
+            appendChat("ai-msg", "Session started. Telemetry active.");
+            visionInterval = setInterval(analyzeFrame, 6000);
+        }
+
+        async function endSession() {
+            clearInterval(visionInterval);
+            const stream = document.getElementById('webcam').srcObject;
+            if (stream) stream.getTracks().forEach(track => track.stop());
+            if (recognition) { recognition.onend = null; recognition.stop(); }
+            
+            appendChat("ai-msg", "Processing background audio telemetry...");
+            document.getElementById('btn-end').innerText = "Processing...";
+            
+            try {
+                const res = await fetch(HEARING_API_URL, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ transcript: sessionTranscript, session_id: sessionId })
+                });
+                const data = await res.json();
+                
+                // Show Quiz Setup Modal
+                document.getElementById('learned-topics').innerText = data.topics;
+                document.getElementById('exam-setup-modal').style.display = 'flex';
+
+            } catch (e) {
+                appendChat("warning-msg", "Could not connect to Hearing Agent.");
+                resetUI();
+            }
+        }
+
+        // =========================================================================
+        // EXAM LOGIC
+        // =========================================================================
+        function skipExam() {
+            document.getElementById('exam-setup-modal').style.display = 'none';
+            appendChat("ai-msg", "Exam skipped. Session concluded.");
+            resetUI();
+        }
+
+        async function generateExam() {
+            const numQs = document.getElementById('num-questions').value;
+            const topics = document.getElementById('learned-topics').innerText;
+            
+            document.getElementById('exam-setup-modal').style.display = 'none';
+            appendChat("ai-msg", `Generating a ${numQs}-question exam on: ${topics}...`);
+            
+            try {
+                const res = await fetch(QUIZ_API_URL, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ topics: topics, num_questions: numQs })
+                });
+                const data = await res.json();
+                
+                if (data.status === "success") {
+                    currentExamData = data.questions;
+                    renderActiveExam();
+                } else {
+                    appendChat("warning-msg", "Could not generate exam: " + data.message);
+                    resetUI();
+                }
+            } catch(e) {
+                appendChat("warning-msg", "Quiz Agent offline.");
+                resetUI();
+            }
+        }
+
+        function renderActiveExam() {
+            document.getElementById('active-exam-modal').style.display = 'flex';
+            let html = `<h2>📝 Knowledge Check</h2>`;
+            
+            currentExamData.forEach((q, i) => {
+                html += `<div class="exam-question" id="q-block-${i}">
+                            <p><strong>${i + 1}. ${q.question}</strong></p>`;
+                q.options.forEach((opt, optIndex) => {
+                    html += `<label class="exam-option">
+                                <input type="radio" name="question_${i}" value="${opt}"> ${opt}
+                             </label>`;
+                });
+                html += `<div id="feedback-${i}" style="margin-top:10px; font-weight:bold; display:none;"></div>
+                         </div>`;
+            });
+            
+            html += `<button class="big-btn" onclick="gradeExam()" style="width:100%;">Submit & Grade Exam</button>`;
+            document.getElementById('exam-content').innerHTML = html;
+        }
+
+        async function gradeExam() {
+            // Change button text so user knows it is saving
+            document.querySelector('.big-btn').innerText = "Saving to BigQuery...";
+            
+            let correctCount = 0;
+            const total = currentExamData.length;
+
+            // Calculate the score
+            currentExamData.forEach((q, i) => {
+                const selected = document.querySelector(`input[name="question_${i}"]:checked`);
+                if (selected && selected.value === q.answer) {
+                    correctCount++;
+                }
+            });
+
+            const scoreText = `${correctCount}/${total} (${Math.round((correctCount/total)*100)}%)`;
+            
+            // Save to BigQuery!
+            try {
+                await fetch(LOG_SCORE_URL, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: sessionId, score_summary: scoreText })
+                });
+            } catch(e) {
+                console.error("Failed to save score");
+            }
+
+            // Put the score in the chat window
+            appendChat("summary-msg", `🎓 **Exam Completed!** Your final score is **${scoreText}**.\n\nGreat job! Your results have been securely saved to the database.`);
+            
+            // IMMEDIATELY close the modal and reset the main UI
+            document.getElementById('active-exam-modal').style.display = 'none';
+            resetUI();
+        }
+
+        function resetUI() {
+            sessionId = null;
+            document.getElementById('session-display').innerText = "";
+            document.getElementById('btn-start').style.display = "inline-block";
+            document.getElementById('btn-analytics').style.display = "inline-block";
+            document.getElementById('btn-end').style.display = "none";
+            document.getElementById('btn-end').innerText = "⏹ End Session";
+            document.getElementById('chat-input').disabled = true;
+            document.getElementById('btn-send').disabled = true;
+            if (recognition) document.getElementById('btn-mic').disabled = true;
+            
+            document.getElementById('status-container').className = "status-box";
+            document.getElementById('focus-score').innerText = "--%";
+            document.getElementById('focus-reason').innerText = "Session concluded.";
+        }
+
+        // =========================================================================
+        // VISION & CHAT FUNCTIONS
+        // =========================================================================
+        async function analyzeFrame() {
+            if (!sessionId) return;
+            const video = document.getElementById('webcam');
+            if (!video.videoWidth) return; 
+            const canvas = document.getElementById('canvas');
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            
+            try {
+                const res = await fetch(VISION_API_URL, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: canvas.toDataURL('image/jpeg'), session_id: sessionId })
+                });
+                const data = await res.json();
+                
+                const score = data.focus_score !== undefined ? data.focus_score : 0;
+                const status = data.status || "Unknown";
+                const reason = data.reason || "Maintaining focus";
+
+                const statusBox = document.getElementById('status-container');
+                document.getElementById('focus-score').innerText = score + "%";
+                document.getElementById('focus-reason').innerText = reason;
+                statusBox.className = status === "Focused" ? "status-box status-focused" : "status-box status-distracted";
+
+                if (status === "Distracted" && currentFocusStatus === "Focused") triggerWarning(reason);
+                currentFocusStatus = status; 
+            } catch (e) {}
+        }
+
+        async function triggerWarning(reason) {
+            try {
+                const res = await fetch(CHAT_API_URL, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: "SYSTEM_TRIGGER_WARNING", reason: reason, session_id: sessionId })
+                });
+                const data = await res.json();
+                playSound('warning');
+                appendChat("warning-msg", data.reply);
+            } catch (e) {}
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const msgText = input.value;
+            if(!msgText || !sessionId) return;
+            
+            appendChat("user-msg", msgText);
+            input.value = "";
+            if (isChatMicActive) toggleMic(); 
+
+            try {
+                const res = await fetch(CHAT_API_URL, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: msgText, session_id: sessionId })
+                });
+                const data = await res.json();
+                appendChat("ai-msg", data.reply);
+            } catch (e) {}
+        }
+
+        function appendChat(className, text) {
+            const chatWindow = document.getElementById('chat-window');
+            const formattedText = (className.includes('ai-msg') || className.includes('summary-msg')) ? marked.parse(text) : text;
+            chatWindow.innerHTML += `<div class="msg ${className}">${formattedText}</div>`;
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+
+        function toggleMic(event) {
+            if (event) event.stopPropagation();
+            if (!recognition) return;
+            isChatMicActive = !isChatMicActive; 
+            const btn = document.getElementById('btn-mic');
+            const input = document.getElementById('chat-input');
+            if (isChatMicActive) {
+                btn.classList.add('recording');
+                input.placeholder = "Listening...";
+            } else {
+                btn.classList.remove('recording');
+                input.placeholder = "Type your question...";
+            }
+        }
+        
+        // Analytics
+        async function openAnalytics() {
+            document.getElementById('analytics-modal').style.display = 'flex';
+            try {
+                const res = await fetch(ANALYTICS_API_URL);
+                const sessions = await res.json();
+                let html = "";
+                sessions.forEach(s => {
+                    html += `<div style="padding:10px; border-bottom:1px solid #eee; cursor:pointer;" onclick="loadSessionDetails('${s.session_id}')">
+                                <strong>${s.start_time}</strong><br><small>${s.session_id}</small>
+                             </div>`;
+                });
+                document.getElementById('session-list').innerHTML = html;
+            } catch (e) {
+                document.getElementById('session-list').innerHTML = "Error loading sessions.";
+            }
+        }
+        async function loadSessionDetails(id) {
+            try {
+                const res = await fetch(`${ANALYTICS_API_URL}/${id}`);
+                const logs = await res.json();
+                let html = `<h3>Logs for ${id}</h3>`;
+                logs.forEach(log => {
+                    if (log.event === 'FOCUS_CHECK') html += `<p>👁️ Vision: ${log.score}% - ${log.reason}</p>`;
+                    else if (log.event === 'WARNING') html += `<p>⚠️ Warning: ${log.ai}</p>`;
+                    else if (log.event === 'CHAT') html += `<p>💬 Chat: User asked a question.</p>`;
+                    else if (log.event === 'HEARING_SUMMARY') html += `<p>🧠 Topics: ${log.ai}</p>`;
+                    else if (log.event === 'EXAM_RESULT') html += `<p>🎓 Exam Score: <strong>${log.ai}</strong></p>`;
+                });
+                document.getElementById('session-details').innerHTML = html;
+            } catch (e) {}
+        }
+    </script>
+</body>
+</html>
