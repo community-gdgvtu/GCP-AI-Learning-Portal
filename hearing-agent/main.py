@@ -14,7 +14,7 @@ model = GenerativeModel("gemini-2.5-flash-lite")
 bq_client = bigquery.Client(project=PROJECT_ID)
 
 # PASTE YOUR ACTUAL QUIZ API URL HERE
-QUIZ_AGENT_URL = "https://quiz-api-459620202221.us-central1.run.app/api/quiz"
+QUIZ_AGENT_URL = "https://your-quiz-api-url.com/api/quiz"
 
 @app.route('/api/hearing', methods=['POST'])
 def analyze_background_audio():

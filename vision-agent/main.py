@@ -16,7 +16,7 @@ model = GenerativeModel("gemini-2.5-flash-lite")
 bq_client = bigquery.Client(project=PROJECT_ID)
 
 # PASTE YOUR ACTUAL TUTOR/CHAT API URL HERE
-CHAT_AGENT_URL = "https://tutor-api-459620202221.us-central1.run.app/api/chat"
+CHAT_AGENT_URL = "https://your-tutor-api-url.com/api/chat"
 
 @app.route('/api/vision', methods=['POST'])
 def analyze_focus():
