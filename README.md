@@ -139,11 +139,38 @@ const LOG_SCORE_URL     = "https://quiz-api-URL.run.app/api/log_score";
 
 ---
 
-### Step 8: Run Frontend
+### Step 8: Deploy Frontend (Cloud Run using Docker)
 
-* Download `index.html`
-* Open in Chrome / Edge
+Create a `Dockerfile` in your root folder:
+
+```dockerfile
+# Use a lightweight Nginx web server
+FROM nginx:alpine
+
+# Copy your website file into the server
+COPY index.html /usr/share/nginx/html/index.html
+
+# Open port 80 for web traffic
+EXPOSE 80
+```
+
+---
+
+### Step 9: Deploy Frontend to Cloud Run
+
+```bash
+gcloud run deploy frontend-ui --source . --region us-central1 --allow-unauthenticated --port 80
+```
+
+👉 After deployment, Cloud Run will give you a **live HTTPS URL** to access your frontend.
+
+---
+
+### Step 10: Run Platform
+
+* Open your deployed frontend URL
 * Allow camera and microphone permissions
+* Click **Start Session**
 
 ---
 
