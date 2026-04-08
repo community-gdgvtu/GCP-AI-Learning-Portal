@@ -36,7 +36,23 @@ This platform uses Multimodal Vision telemetry, Background Audio processing, and
 
 ## 🛠️ Deployment Guide
 
+### 🔐 Step 0: Open Google Cloud Console
+
+1. Go to: https://console.cloud.google.com
+2. Login using an account with **free trial credits**
+3. Open **Cloud Shell** (top-right terminal icon)
+4. Open **Cloud Shell Editor**
+5. In editor:
+
+   * Click **File (top-right)** → **Open Folder**
+   * Open: `home/your_username`
+6. Open terminal inside editor
+
+---
+
 ### Step 1: Setup Cloud Shell
+
+Run the following commands in terminal:
 
 ```bash
 gcloud auth login
@@ -67,14 +83,19 @@ cd GCP-AI-Learning-Portal
 In all agent folders (`main.py`):
 
 ```python
-PROJECT_ID = "YOUR_PROJECT_ID"
+PROJECT_ID = "your_project_id"
 ```
 
 ---
 
 ### Step 5: Setup BigQuery
 
-Run this in BigQuery SQL Workspace:
+1. Go to **Google Cloud Main Page**
+2. Click **☰ Menu (top-left, three horizontal lines)**
+3. Select **BigQuery**
+4. Open a **New SQL Editor Tab**
+5. Replace `YOUR_PROJECT_ID` with your actual project ID
+6. Paste and run the following:
 
 ```sql
 CREATE SCHEMA IF NOT EXISTS `YOUR_PROJECT_ID.focus_db`;
@@ -92,7 +113,11 @@ CREATE TABLE IF NOT EXISTS `YOUR_PROJECT_ID.focus_db.session_logs` (
 
 ---
 
-### Step 6: Deploy Microservices
+### Step 6: Deploy Microservices (IMPORTANT ORDER)
+
+⚠️ Deploy services **sequentially in this exact order**
+
+---
 
 #### 📝 Quiz Agent
 
@@ -101,12 +126,28 @@ cd /quiz-agent
 gcloud run deploy quiz-api --source . --region us-central1 --allow-unauthenticated --memory 2Gi --min-instances 1
 ```
 
+👉 After deployment, copy the URL and update in **hearing-agent**:
+
+```python
+QUIZ_AGENT_URL = "https://your-quiz-api-url.com/api/quiz"
+```
+
+---
+
 #### 🤖 Tutor Agent
 
 ```bash
 cd ../tutor-agent
 gcloud run deploy tutor-api --source . --region us-central1 --allow-unauthenticated --memory 2Gi --min-instances 1
 ```
+
+👉 After deployment, copy the URL and update in **vision-agent**:
+
+```python
+CHAT_AGENT_URL = "https://your-tutor-api-url.com/api/chat"
+```
+
+---
 
 #### 👂 Hearing Agent
 
@@ -115,6 +156,7 @@ cd ../hearing-agent
 gcloud run deploy hearing-api --source . --region us-central1 --allow-unauthenticated --memory 2Gi --min-instances 1
 ```
 
+---
 
 #### 👁️ Vision Agent
 
@@ -134,43 +176,39 @@ const VISION_API_URL    = "https://vision-api-URL.run.app/api/vision";
 const CHAT_API_URL      = "https://tutor-api-URL.run.app/api/chat";
 const ANALYTICS_API_URL = "https://tutor-api-URL.run.app/api/sessions";
 const HEARING_API_URL   = "https://hearing-api-URL.run.app/api/hearing";
-const QUIZ_API_URL      = "https://quiz-api-URL.run.app/api/quiz";
 const LOG_SCORE_URL     = "https://quiz-api-URL.run.app/api/log_score";
 ```
 
 ---
 
-### Step 8: Deploy Frontend (Cloud Run using Docker)
+### Step 8: Create Dockerfile for Frontend
 
-Create a `Dockerfile` in your root folder:
+Create a new file named `Dockerfile` in your project directory and copy the following contents into it:
 
 ```dockerfile
-# Use a lightweight Nginx web server
 FROM nginx:alpine
 
-# Copy your website file into the server
 COPY index.html /usr/share/nginx/html/index.html
 
-# Open port 80 for web traffic
 EXPOSE 80
 ```
 
 ---
 
-### Step 9: Deploy Frontend to Cloud Run
+### Step 9: Deploy Frontend
 
 ```bash
 gcloud run deploy frontend-ui --source . --region us-central1 --allow-unauthenticated --port 80
 ```
 
-👉 After deployment, Cloud Run will give you a **live HTTPS URL** to access your frontend.
+👉 You will receive a **live HTTPS URL**
 
 ---
 
 ### Step 10: Run Platform
 
-* Open your deployed frontend URL
-* Allow camera and microphone permissions
+* Open frontend URL
+* Allow camera & microphone
 * Click **Start Session**
 
 ---
@@ -192,9 +230,3 @@ gcloud run deploy frontend-ui --source . --region us-central1 --allow-unauthenti
 * AI: Vertex AI (Gemini)
 * Cloud: Google Cloud Run
 * Database: BigQuery
-
----
-
-## 👨‍💻 Author
-
-**Prajwal Rawoot**
