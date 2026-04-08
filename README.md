@@ -56,7 +56,7 @@ gcloud services enable run.googleapis.com aiplatform.googleapis.com bigquery.goo
 ### Step 3: Clone Repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/GCP-AI-Learning-Portal.git
+git clone https://github.com/community-gdgvtu/GCP-AI-Learning-Portal.git
 cd GCP-AI-Learning-Portal
 ```
 
