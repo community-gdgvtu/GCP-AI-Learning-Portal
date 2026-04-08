@@ -94,11 +94,11 @@ CREATE TABLE IF NOT EXISTS `YOUR_PROJECT_ID.focus_db.session_logs` (
 
 ### Step 6: Deploy Microservices
 
-#### 👁️ Vision Agent
+#### 📝 Quiz Agent
 
 ```bash
-cd vision-agent
-gcloud run deploy vision-api --source . --region us-central1 --allow-unauthenticated --memory 2Gi --min-instances 1
+cd /quiz-agent
+gcloud run deploy quiz-api --source . --region us-central1 --allow-unauthenticated --memory 2Gi --min-instances 1
 ```
 
 #### 🤖 Tutor Agent
@@ -115,11 +115,12 @@ cd ../hearing-agent
 gcloud run deploy hearing-api --source . --region us-central1 --allow-unauthenticated --memory 2Gi --min-instances 1
 ```
 
-#### 📝 Quiz Agent
+
+#### 👁️ Vision Agent
 
 ```bash
-cd ../quiz-agent
-gcloud run deploy quiz-api --source . --region us-central1 --allow-unauthenticated --memory 2Gi --min-instances 1
+cd ../vision-agent
+gcloud run deploy vision-api --source . --region us-central1 --allow-unauthenticated --memory 2Gi --min-instances 1
 ```
 
 ---
