@@ -7,7 +7,7 @@ from google.cloud import bigquery
 app = Flask(__name__)
 CORS(app)
 
-PROJECT_ID = "focus-mode-491514"
+PROJECT_ID = "your_project_id"
 vertexai.init(project=PROJECT_ID, location="us-central1")
 model = GenerativeModel("gemini-2.5-flash-lite")
 bq_client = bigquery.Client(project=PROJECT_ID)
