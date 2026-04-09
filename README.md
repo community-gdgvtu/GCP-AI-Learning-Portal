@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS `YOUR_PROJECT_ID.focus_db.session_logs` (
 #### 📝 Quiz Agent
 
 ```bash
-cd /quiz-agent
+cd quiz-agent
 gcloud run deploy quiz-api --source . --region us-central1 --allow-unauthenticated --memory 2Gi --min-instances 1
 ```
 
